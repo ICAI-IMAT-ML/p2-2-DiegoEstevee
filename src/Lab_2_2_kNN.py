@@ -56,11 +56,9 @@ class knn:
         """
         # Validaciones
         if len(X_train) != len(y_train):
-            raise ValueError("X_train and y_train must have the same number of samples.")
-        if k <= 0:
-            raise ValueError("k must be a positive integer.")
-        if p <= 0:
-            raise ValueError("p must be a positive integer.")
+            raise ValueError("Length of X_train and y_train must be equal.")
+        if k <= 0 or p <= 0:
+            raise ValueError("k and p must be positive integers.")
                
         self.k = k
         self.p = p
@@ -144,7 +142,10 @@ class knn:
         Returns:
             np.ndarray: distance from point to each point in the training dataset.
         """
-        # TODO
+        distances = np.zeros(len(self.x_train), dtype=float)
+        for i, x in enumerate(self.x_train):
+            distances[i] = minkowski_distance(point, x, p=self.p)
+        return distances
 
     def get_k_nearest_neighbors(self, distances: np.ndarray) -> np.ndarray:
         """Get the k nearest neighbors indices given the distances matrix from a point.
@@ -158,7 +159,10 @@ class knn:
         Hint:
             You might want to check the np.argsort function.
         """
-        # TODO
+        # Ordenamos los índices de menor a mayor distancia
+        sorted_indices = np.argsort(distances)
+        # Retornamos los primeros k
+        return sorted_indices[:self.k]
 
     def most_common_label(self, knn_labels: np.ndarray) -> int:
         """Obtain the most common label from the labels of the k nearest neighbors
@@ -169,7 +173,12 @@ class knn:
         Returns:
             int: most common label
         """
-        # TODO
+        # Obtenemos las etiquetas únicas y su conteo
+        unique_labels, counts = np.unique(knn_labels, return_counts=True)
+        # Encuentra el índice en el que se produce la máxima frecuencia
+        max_count_index = np.argmax(counts)
+        # Devuelve la etiqueta correspondiente
+        return unique_labels[max_count_index]
 
     def __str__(self):
         """
@@ -273,23 +282,38 @@ def evaluate_classification_metrics(y_true, y_pred, positive_label):
     y_true_mapped = np.array([1 if label == positive_label else 0 for label in y_true])
     y_pred_mapped = np.array([1 if label == positive_label else 0 for label in y_pred])
 
-    # Confusion Matrix
-    # TODO
+    # Confusion Matrix components
+    tp = np.sum((y_true_mapped == 1) & (y_pred_mapped == 1))
+    tn = np.sum((y_true_mapped == 0) & (y_pred_mapped == 0))
+    fp = np.sum((y_true_mapped == 0) & (y_pred_mapped == 1))
+    fn = np.sum((y_true_mapped == 1) & (y_pred_mapped == 0))
 
     # Accuracy
-    # TODO
+    accuracy = (tp + tn) / (tp + tn + fp + fn)
 
     # Precision
-    # TODO
+    if (tp + fp) == 0:
+        precision = 0.0
+    else:
+        precision = tp / (tp + fp)
 
     # Recall (Sensitivity)
-    # TODO
+    if (tp + fn) == 0:
+        recall = 0.0
+    else:
+        recall = tp / (tp + fn)
 
     # Specificity
-    # TODO
+    if (tn + fp) == 0:
+        specificity = 0.0
+    else:
+        specificity = tn / (tn + fp)
 
     # F1 Score
-    # TODO
+    if (precision + recall) == 0:
+        f1 = 0.0
+    else:
+        f1 = 2 * (precision * recall) / (precision + recall)
 
     return {
         "Confusion Matrix": [tn, fp, fn, tp],
@@ -325,7 +349,46 @@ def plot_calibration_curve(y_true, y_probs, positive_label, n_bins=10):
             - "true_proportions": Array of the fraction of positives in each bin
 
     """
-    # TODO
+        # Map y_true to 0/1
+    y_true_mapped = np.array([1 if y == positive_label else 0 for y in y_true])
+    y_probs = np.array(y_probs)
+
+    # 1. Definir los bordes de los bins
+    bin_edges = np.linspace(0, 1, n_bins + 1)
+    
+    # 2. Los centros serán simplemente la mitad de cada bin
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2  # length = n_bins
+
+    # 3. Asignar a cada probabilidad un índice de bin
+    #    digitize crea índices en [1..n_bins], restamos 1 para [0..n_bins-1]
+    bin_indices = np.digitize(y_probs, bin_edges) - 1
+
+    # Inicializar el array de fracciones de positivos
+    true_proportions = np.zeros(n_bins, dtype=float)
+
+    # 4. Para cada bin, calcular la fracción de positivos
+    for i in range(n_bins):
+        # Mascara: qué muestras cayeron en el bin i
+        mask = (bin_indices == i)
+        if np.any(mask):
+            # Promedio de y_true_mapped en ese bin = fracción de 1s
+            true_proportions[i] = np.mean(y_true_mapped[mask])
+        else:
+            # Si el bin está vacío, puede ponerse 0 o NaN
+            true_proportions[i] = 0.0  # o np.nan
+    
+    # 5. (Opcional) Graficar
+    #    Si tu test falla al mostrar la gráfica, podrías omitir el plt.show().
+    plt.figure(figsize=(6, 6))
+    plt.plot(bin_centers, true_proportions, marker='o', label='Calibration curve')
+    plt.plot([0, 1], [0, 1], '--', color='gray', label='Perfect calibration')
+    plt.title("Calibration Curve")
+    plt.xlabel("Bin center (fixed midpoint)")
+    plt.ylabel("Fraction of positives")
+    plt.legend()
+    plt.grid(True)
+
+
     return {"bin_centers": bin_centers, "true_proportions": true_proportions}
 
 
