@@ -19,8 +19,12 @@ def minkowski_distance(a, b, p=2):
         float: Minkowski distance between arrays a and b.
     """
 
-    # TODO
+    # Verificamos que 'p' sea un entero positivo
+    if p <= 0:
+        raise ValueError("p must be a positive integer.")
 
+    # Calculamos la norma p de la diferencia entre a y b
+    return np.power(np.sum(np.abs(a - b) ** p), 1 / p)
 
 # k-Nearest Neighbors Model
 
@@ -50,7 +54,20 @@ class knn:
             k (int, optional): Number of neighbors to use. Defaults to 5.
             p (int, optional): The degree of the Minkowski distance. Defaults to 2.
         """
-        # TODO
+        # Validaciones
+        if len(X_train) != len(y_train):
+            raise ValueError("X_train and y_train must have the same number of samples.")
+        if k <= 0:
+            raise ValueError("k must be a positive integer.")
+        if p <= 0:
+            raise ValueError("p must be a positive integer.")
+               
+        self.k = k
+        self.p = p
+        self.x_train = X_train
+        self.y_train = y_train
+        # Guardamos las clases únicas para luego manejar el orden en predict_proba
+        self.classes_ = np.unique(y_train)
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
@@ -62,7 +79,23 @@ class knn:
         Returns:
             np.ndarray: Predicted class labels.
         """
-        # TODO
+        predictions = []
+        
+        for point in X:
+            # 1. Computar distancias de este punto a todos en x_train
+            distances = self.compute_distances(point)
+
+            # 2. Obtener los k vecinos más cercanos
+            knn_indices = self.get_k_nearest_neighbors(distances)
+
+            # 3. Obtener los labels de esos k vecinos
+            knn_labels = self.y_train[knn_indices]
+
+            # 4. Escoger el label más común
+            label = self.most_common_label(knn_labels)
+            predictions.append(label)
+        
+        return np.array(predictions)
 
     def predict_proba(self, X):
         """
@@ -77,7 +110,30 @@ class knn:
         Returns:
             np.ndarray: Predicted class probabilities.
         """
-        # TODO
+        # Matriz de probabilidades a devolver
+        # filas = número de muestras, columnas = número de clases
+        proba_matrix = np.zeros((X.shape[0], len(self.classes_)), dtype=float)
+
+        for i, point in enumerate(X):
+            # 1. Calcular las distancias del punto i a todos los puntos del dataset
+            distances = self.compute_distances(point)
+
+            # 2. Obtener los índices de los k vecinos más cercanos
+            knn_indices = self.get_k_nearest_neighbors(distances)
+
+            # 3. Obtener las etiquetas de esos vecinos
+            knn_labels = self.y_train[knn_indices]
+
+            # 4. Encontrar cuántas veces aparece cada etiqueta en los k vecinos
+            unique_labels, counts = np.unique(knn_labels, return_counts=True)
+
+            # 5. Para cada etiqueta encontrada entre los vecinos, asignar su proporción
+            for label, count in zip(unique_labels, counts):
+                # Buscamos la posición que corresponde a 'label' en self.classes_
+                label_index = np.where(self.classes_ == label)[0][0]
+                proba_matrix[i, label_index] = count / self.k
+        
+        return proba_matrix
 
     def compute_distances(self, point: np.ndarray) -> np.ndarray:
         """Compute distance from a point to every point in the training dataset
